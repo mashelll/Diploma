@@ -28,50 +28,49 @@ class ZfitParameteter(InvalidateCacheGlobal):
         self.invalidate_cache()  # can be moved to a decorator, but not important now
         self.x = value
 
+
 class FunctionArguments():
+  """Class-wraper for input function arguments so we can use them as dictionary key"""
+
   def __init__(self, args):
     self.input_args = args
-    args_list = list()
-    for arg in args:
-      if tf.is_tensor(arg):
-        args_list.append(arg.ref())
-      else:
-        args_list.append(arg)
-    self.args = tuple(args_list)
-
+  
   def __hash__(self):
-        return hash(dill.dumps(self.input_args))
+        #print("inside function __hash__")
+        #print(self.input_args)
+        #print(type(self.input_args[0]))
+        return hash(dill.dumps(self.input_args[0]))
 
   def __eq__(self, other):
-        print("eq")
         return isinstance(other, FunctionArguments) and self._compare_args(other)
 
   def _compare_args(self, other):
-    for arg1, arg2 in zip(self.args, other.args):
-      if type(arg1) == Reference:
-        arg1 = arg1.deref()
-      if type(arg2) == Reference:
-        arg2 = arg2.deref()
+    for arg1, arg2 in zip(self.input_args, other.input_args):
       if not arg1.__eq__(arg2):
         return False
     return True
 
   def __repr__(self):
     result = ''
-    for arg in self.args:
-      if type(arg) == Reference:
-        result += str(arg.deref().numpy())
-      else:
-        result += str(arg)
-      result += ' '
+    for arg in self.input_args:
+        result += str(arg.numpy())
+        result += ' '
     return result
 
 
 class ZfitFunc():
+    
     def cache(func):
+        """Caching decorator"""
+
         @functools.wraps(func)
         def wraper(self, *args):
           func_args = FunctionArguments(args)
+          #print("input args of function = " + str(func.__name__) + ":")
+          #for arg in func_args.input_args:
+            #print(arg)
+            #print(type(arg))
+          #print('\n')
           if str(func.__name__) in cache:
             if func_args in cache[str(func.__name__)]:
               return cache[str(func.__name__)][func_args]
@@ -89,13 +88,18 @@ class ZfitFunc():
 
     @cache
     @jit
-    def func(self, data):  # cache this value and the gradient
+    def func(self, data):
         return data * self.param.get_value()
 
     @cache
     @jit
     def integral(self, lower, upper):
-        # cache
+        #print("inside integral")
+        #print(upper)
+        #print(type(upper))
+        #print(self.func(upper))
+        #print(type(self.func(upper)))
+        #print('\n')
         return upper * self.func(upper) - lower * self.func(lower)
 
 
@@ -107,3 +111,9 @@ print(cache)
 func.func(znp.array(21.))
 print(cache)
 print(func.integral(znp.array(4.), znp.array(5.)))
+print(cache)
+param.set_value(znp.array(2.))
+print(cache)
+#func = ZfitFunc(param)
+print(func.func(znp.array(10.)))
+print(cache)
